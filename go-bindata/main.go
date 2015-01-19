@@ -7,7 +7,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/jteeuwen/go-bindata"
+	"github.com/mountkin/go-bindata"
 	"os"
 	"path/filepath"
 	"regexp"

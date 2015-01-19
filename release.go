@@ -35,18 +35,10 @@ func writeRelease(w io.Writer, c *Config, toc []Asset) error {
 // This targets release builds.
 func writeReleaseHeader(w io.Writer, c *Config) error {
 	var err error
-	if c.NoCompress {
-		if c.NoMemCopy {
-			err = header_uncompressed_nomemcopy(w)
-		} else {
-			err = header_uncompressed_memcopy(w)
-		}
+	if c.NoMemCopy {
+		err = header_nomemcopy(w)
 	} else {
-		if c.NoMemCopy {
-			err = header_compressed_nomemcopy(w)
-		} else {
-			err = header_compressed_memcopy(w)
-		}
+		err = header_memcopy(w)
 	}
 	if err != nil {
 		return err
@@ -97,87 +89,7 @@ func sanitize(b []byte) []byte {
 	return bytes.Replace(b, []byte("\xEF\xBB\xBF"), []byte("`+\"\\xEF\\xBB\\xBF\"+`"), -1)
 }
 
-func header_compressed_nomemcopy(w io.Writer) error {
-	_, err := fmt.Fprintf(w, `import (
-	"bytes"
-	"compress/gzip"
-	"fmt"
-	"io"
-	"reflect"
-	"strings"
-	"unsafe"
-	"os"
-	"time"
-	"io/ioutil"
-	"path"
-	"path/filepath"
-)
-
-func bindata_read(data, name string) ([]byte, error) {
-	var empty [0]byte
-	sx := (*reflect.StringHeader)(unsafe.Pointer(&data))
-	b := empty[:]
-	bx := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	bx.Data = sx.Data
-	bx.Len = len(data)
-	bx.Cap = bx.Len
-
-	gz, err := gzip.NewReader(bytes.NewBuffer(b))
-	if err != nil {
-		return nil, fmt.Errorf("Read %%q: %%v", name, err)
-	}
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, gz)
-	gz.Close()
-
-	if err != nil {
-		return nil, fmt.Errorf("Read %%q: %%v", name, err)
-	}
-
-	return buf.Bytes(), nil
-}
-
-`)
-	return err
-}
-
-func header_compressed_memcopy(w io.Writer) error {
-	_, err := fmt.Fprintf(w, `import (
-	"bytes"
-	"compress/gzip"
-	"fmt"
-	"io"
-	"strings"
-	"os"
-	"time"
-	"io/ioutil"
-	"path"
-	"path/filepath"
-)
-
-func bindata_read(data []byte, name string) ([]byte, error) {
-	gz, err := gzip.NewReader(bytes.NewBuffer(data))
-	if err != nil {
-		return nil, fmt.Errorf("Read %%q: %%v", name, err)
-	}
-
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, gz)
-	gz.Close()
-
-	if err != nil {
-		return nil, fmt.Errorf("Read %%q: %%v", name, err)
-	}
-
-	return buf.Bytes(), nil
-}
-
-`)
-	return err
-}
-
-func header_uncompressed_nomemcopy(w io.Writer) error {
+func header_nomemcopy(w io.Writer) error {
 	_, err := fmt.Fprintf(w, `import (
 	"fmt"
 	"reflect"
@@ -205,7 +117,7 @@ func bindata_read(data, name string) ([]byte, error) {
 	return err
 }
 
-func header_uncompressed_memcopy(w io.Writer) error {
+func header_memcopy(w io.Writer) error {
 	_, err := fmt.Fprintf(w, `import (
 	"fmt"
 	"strings"
@@ -299,13 +211,10 @@ func compressed_memcopy(w io.Writer, asset *Asset, r io.Reader) error {
 	_, err = fmt.Fprintf(w, `")
 
 func %s_bytes() ([]byte, error) {
-	return bindata_read(
-		_%s,
-		%q,
-	)
+	return _%s, nil
 }
 
-`, asset.Func, asset.Func, asset.Name)
+`, asset.Func, asset.Func)
 	return err
 }
 
